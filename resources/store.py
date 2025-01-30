@@ -4,7 +4,6 @@ from flask.views import MethodView
 from flask_smorest import Blueprint, abort
 from db import stores
 
-
 bp = Blueprint('stores', __name__, description='stores service')
 
 @bp.route('/store/<string:store_id>')
