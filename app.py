@@ -30,5 +30,4 @@ def create_app(db_url = None):
     api.register_blueprint(store_bp)
     api.register_blueprint(item_bp)
 
-
     return app
