@@ -2,7 +2,10 @@ import uuid
 from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
+from models.item import ItemModel
 from schemas import ItemSchema, ItemUpdateSchema
+from db import db
+from sqlalchemy.exc import SQLAlchemyError
 
 bp = Blueprint('items', __name__, description="items service")
 
@@ -10,23 +13,34 @@ bp = Blueprint('items', __name__, description="items service")
 class Item(MethodView):
     @bp.response(200, ItemSchema)
     def get(self, item_id):
-        if item_id not in items:
-            abort(404, message='Item not found')
-        return items[item_id], 200
+        item = ItemModel.query.get_or_404(item_id)
+        return item
 
     @bp.arguments(ItemUpdateSchema)
     @bp.response(200, ItemSchema)
     def put(self, data, item_id):
-        if item_id not in items:
-            abort(404, message='Item not found')
-        items[item_id] = {**items[item_id], **data}
-        return items[item_id], 200
+        item = ItemModel.query.get_or_404(item_id)
+        if item:
+            item.price = data['price']
+            item.name = data['name']
+        else:
+            item = ItemModel(**data)
+
+        try:
+            db.session.add(item)
+            db.session.commit()
+        except SQLAlchemyError:
+            abort(500, message='Error occurred while modifying the item')
+        
+        return item
 
     def delete(self, item_id):
-        if item_id not in items:
-            abort(404, message='Item not found')
-        del items[item_id]
-        return {'message': 'Successfully deleted'}, 200
+        item = ItemModel.query.get_or_404(item_id)
+        db.session.delete(item)
+        db.session.commit()
+
+        return {'message': 'Item deleted successfully'}    
+
 
     
 @bp.route('/item')
@@ -34,15 +48,19 @@ class ItemList(MethodView):
 
     @bp.response(200, ItemSchema(many=True))
     def get(self):
-        return items.values()
+        return ItemModel.query.all()
 
     @bp.arguments(ItemSchema)
     @bp.response(201, ItemSchema)
     def post(self, data):
-        if data['store_id'] not in stores:
-            abort(404, message='Store not found')
-        item_id = uuid.uuid4().hex
-        new_item = {**data, 'id': item_id}
-        items[item_id] = new_item
         
-        return {'item': new_item}, 201
+        item = ItemModel(**data)
+
+        try:
+            db.session.add(item)
+            db.session.commit()
+        except SQLAlchemyError:
+            abort(500, message='An error occurred while inserting the item')
+
+        
+        return item, 201

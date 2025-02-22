@@ -2,7 +2,11 @@ import uuid
 from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint, abort
+from flask_sqlalchemy import SQLAlchemy
+from models.store import StoreModel
 from schemas import StoreSchema
+from db import db
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 bp = Blueprint('stores', __name__, description='stores service')
 
@@ -10,15 +14,15 @@ bp = Blueprint('stores', __name__, description='stores service')
 class Stores(MethodView):
     @bp.response(200, StoreSchema)
     def get(self, store_id):
-        if store_id not in stores:
-            abort(404, message='Store not found')
-        return {'store': stores[store_id]}, 201
+        store = StoreModel.query.get_or_404(store_id)
+        return store
 
     def delete(self, store_id):
-        if store_id not in stores:
-            abort(404, message='Store not found')
-        del stores[store_id]
-        return {'message': "Successfully deleted"}, 200
+        store = StoreModel.query.get_or_404(store_id)
+        db.session.delete(store)
+        db.session.commit()
+
+        return {'message': "Store deleted successfully"}
     
 
 @bp.route('/store')
@@ -26,12 +30,20 @@ class StoreList(MethodView):
 
     @bp.response(200, StoreSchema(many=True))
     def get(self):
-        return stores.values()
+        return StoreModel.query.all()
+
 
     @bp.arguments(StoreSchema)
     @bp.response(201, StoreSchema)
     def post(self, data):
-        store_id = uuid.uuid4().hex
-        new_store = {**data, 'id': store_id}
-        stores[store_id] = new_store
-        return new_store, 201
+        
+        store = StoreModel(**data)
+        try:
+            db.session.add(store)
+            db.session.commit()
+        except IntegrityError:
+            abort(400, message='Store already exists')
+        except SQLAlchemyError:
+            abort(500, messsage='Error occurred while adding the store')
+
+        return store, 201
