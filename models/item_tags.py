@@ -1,6 +1,6 @@
 from db import db
 
-class ItemTags:
+class ItemTags(db.Model):
 
     __tablename__ = 'items_tags'
 
