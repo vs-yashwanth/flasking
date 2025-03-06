@@ -6,11 +6,13 @@ from models.item import ItemModel
 from schemas import ItemSchema, ItemUpdateSchema
 from db import db
 from sqlalchemy.exc import SQLAlchemyError
+from flask_jwt_extended import jwt_required
 
 bp = Blueprint('items', __name__, description="items service")
 
 @bp.route('/item/<string:item_id>')
 class Item(MethodView):
+    @jwt_required()
     @bp.response(200, ItemSchema)
     def get(self, item_id):
         item = ItemModel.query.get_or_404(item_id)
@@ -34,6 +36,7 @@ class Item(MethodView):
         
         return item
 
+    @jwt_required()
     def delete(self, item_id):
         item = ItemModel.query.get_or_404(item_id)
         db.session.delete(item)
@@ -50,6 +53,7 @@ class ItemList(MethodView):
     def get(self):
         return ItemModel.query.all()
 
+    @jwt_required(fresh=True)
     @bp.arguments(ItemSchema)
     @bp.response(201, ItemSchema)
     def post(self, data):
